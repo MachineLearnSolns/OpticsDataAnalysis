@@ -1,0 +1,487 @@
+
+# Spotfire S+ - 1st order -  distance solve & index & radius solve 
+
+# with automation
+# Input
+
+# c, p & t/n - edit version
+# declare all variables, ri,ti,ni are input and c,p,tn is output
+
+# declare variables
+# common
+rowcount = 0
+rowcount = nrow(lei)
+ls <- matrix('numeric',rowcount,13)
+le <- matrix('numeric',rowcount,13)
+
+# glass
+glass <- matrix('numeric',100, 15)
+
+# aperture index illumination object optimization data
+aiiood <- matrix('numeric',1,27)
+
+# illumination
+beamcomp <- vector('numeric',12)
+beam <- vector('numeric',12)
+
+
+# trace
+y <- vector('numeric',rowcount)
+nu <- vector('numeric',rowcount)
+ans <- vector('numeric',4)
+y1 <- vector('numeric',100)
+nu1 <- vector('numeric',100)
+y2 <- vector('numeric',100)
+nu2 <- vector('numeric',100)
+y3 <- vector('numeric',100)
+nu3 <- vector('numeric',100)
+
+
+# index profile
+indexpro <- matrix('numeric',100,6)
+yin <- vector('numeric',100)
+nuin <- vector('numeric',100)
+yintry <- vector('numeric',100)
+nuintry <- vector('numeric',100)
+nefftry <- vector('numeric',100)
+indprout <- vector('numeric',2)
+indprout1 <- vector('numeric',2)
+indsurfcount = 1
+inp = 0
+yin1 = 0
+nuin1 = 0
+yintry2 = 0
+nuintry2 = 0
+neff  = 0
+nefftrycount = 0
+
+# computational variables
+i = 1
+j = 1
+ia = 1
+ja = 1
+c = 0
+e1 = 0
+d1 = 0
+e2 = 0
+d2 = 0
+e3 = 0
+d3 = 0
+tns = 0
+
+# graphing
+lsg <- matrix('numeric',rowcount,13) 
+yg <- matrix('numeric',rowcount,13) 
+xg <- matrix('numeric',rowcount,13) 
+nug <- matrix('numeric',rowcount,13) 
+ParaxialTrace <- matrix('character',rowcount,16) 
+
+# graphing with meridional trace  - for your reference only
+u <- vector('numeric',rowcount)
+up <- vector('numeric',rowcount)
+q <- vector('numeric',rowcount)
+qp <- vector('numeric',rowcount)
+I <- vector('numeric',rowcount)
+Ip <- vector('numeric',rowcount)
+lsga <- matrix('numeric',rowcount,13) 
+yga <- matrix('numeric',rowcount,13) 
+xga <- matrix('numeric',rowcount,13) 
+nuga <- matrix('numeric',rowcount,13) 
+MeridionalTrace <- matrix('character',rowcount,16) 
+
+# input
+le = lei
+glass = glassi
+aiiood = aiioodi
+
+# entrance pupil diameter - light matter interactions
+epd = aiiood[1,4] #19*(1/1)
+stop = 0
+expd =  aiiood[1,5]
+raycount = 0
+objectsize = aiiood[1,6]
+objectoffset = aiiood[1,7]
+
+
+# index parameters
+p1 = aiiood[1,8]
+p2 = aiiood[1,9]
+p3 = aiiood[1,10]
+
+# index profile detector
+for (i in 2:rowcount)
+{
+indsurfcount = indsurfcount + 1
+if(le[i,3] == 857)
+{
+break
+}
+}
+
+
+inp = le[indsurfcount,2]/100
+
+for(i in 1:100)
+{
+indexpro[i,1] = 0
+indexpro[i,2] = inp
+indexpro[i,3] = (p1 + 1 -  (((i*inp)^p2)/(p3^p2 + (i*inp)^p2)) ) #/(p3^p2 + (i*inp)^p2)) ) #1 + 0.5*exp(-((inp*i)^2 + p1 + p2 + p3)/100)#-(inp^2/100))
+#indexpro[i,3] = 1 + 0.5*exp(-((inp*i)^2 + p1 + p2 + p3)/100)#-(inp^2/100))
+indexpro[i,4] = 0
+indexpro[i,5] = 0
+indexpro[i,6] = inp/(p1 + 1 -  (((i*inp)^p2)/(p3^p2 + (i*inp)^p2)) ) #inp/(1 + 0.5*exp(-((inp*i)^2 + p1 + p2 + p3)/100))
+#indexpro[i,6] = inp/(1 + 0.5*exp(-((inp*i)^2 + p1 + p2 + p3)/100))
+}
+
+
+yin1 = 0
+nuin1 = epd/(100*le[2,2])
+
+yin[1] = yin1
+nuin[1] = nuin1
+fin = 0
+
+for(i in 2:1:100)
+{
+yin[i] = yin[i - 1] + nuin[i - 1]*as.numeric(indexpro[1,6])
+nuin[i] = nuin[i - 1] + as.numeric(indexpro[i,5])*yin[i]
+}
+
+# output
+indprout[1] = yin[100]
+indprout[2] = nuin[100]
+
+# effective index calculation
+
+# iteration
+for(i in 1:100)
+{
+nefftry[i] = 1 + (i/50)
+yintry[i] = yin1 + nuin1*(le[indsurfcount,2]/nefftry[i]) 
+nuintry[i] = nuin1 + nefftry[i]*yintry[i]
+}
+
+# sort
+neff  = 0
+nefftrycount = 1
+yintry2 = yintry[1]
+nuintry2 = nuintry[1]
+for(i in 1:100)
+{
+if((abs(yintry2 - indprout[1])  + abs(nuintry2 - indprout[2])) > (abs(yintry[i] - indprout
+
+[1]) + abs(nuintry[i] - indprout[2])))
+{
+yintry2 = yintry[i]
+nuintry2 = nuintry[i]
+nefftrycount = i
+}
+}
+
+neff = nefftry[nefftrycount]
+# drop in the effective index
+if(indsurfcount < rowcount)
+{
+le[indsurfcount,3] = neff
+}
+
+# index profile end
+# functions
+
+# c-p-tn function
+cptn <- function(le)
+{
+
+# c
+for (i in 1:rowcount)
+{
+if (le[i,1] != 0)
+le[i,7] = 1/le[i,1]
+else
+le[i,7] = 0
+
+}
+
+# p
+for (i in 1:rowcount)
+{
+if (le[i,1] != 0)
+le[i,8] = (le[i,3] - le[i+1,3])*le[i,7]
+}
+
+# t/n
+for (i in 1:rowcount)
+{
+if (le[i,2] != 0)
+le[i,9] = le[i,2]/le[i,3] 
+else
+le[i,9] = 0
+}
+return(le)
+}
+
+# compute c-p-tn for lens_solve
+ls = cptn(le)
+
+# solve
+
+
+# declare input
+
+
+#boundary
+y[1] = 0
+nu[1] = epd/ls[2,2]
+
+
+for(i in 2:rowcount)
+{
+if (ls[i,9] == 847)
+{
+c = i
+break
+}
+y[i] = y[i - 1] + nu[i - 1]*ls[i,9]
+nu[i] = nu[i - 1] + ls[i,8]*y[i] + ls[i,5]*ls[i,3]
+
+}
+
+# no solve condition start
+if(c > 0)
+{
+
+j = 1
+
+# course tuning
+
+for (j in 1:1:100)
+{
+ls[c,9] = -5000 + j*100
+for (i in c:rowcount)
+{
+y[i] = y[i - 1] + nu[i - 1]*ls[i,9]
+nu[i] = nu[i - 1] + ls[i,8]*y[i] + ls[i,5]*ls[i,3]
+}
+y1[j] = abs(y[rowcount])
+nu1[j] = nu[rowcount - 1]
+}
+
+
+d1 = y1[1]
+e1 = 1
+
+for (j in 1:1:100)
+{
+if(y1[j]<d1)
+{
+d1 = y1[j]
+e1 = -5000 + j*100
+}
+}
+
+
+# mid tuning
+
+j = 0
+
+for (j in 1:1:100)
+{
+ls[c,9] =  e1 - 250 + j*5
+for (i in c:rowcount)
+{
+y[i] = y[i - 1] + nu[i - 1]*ls[i,9]
+nu[i] = nu[i - 1] + ls[i,8]*y[i] + ls[i,5]*ls[i,3]
+}
+y2[j] = abs(y[rowcount])
+nu2[j] = nu[rowcount - 1]
+}
+
+
+d2 = y2[1]
+e2 = 1
+
+for (j in 1:1:100)
+{
+if(y2[j]<d2)
+{
+d2 = y2[j]
+e2 = e1 - 250 + j*5
+}
+}
+
+
+# fine tuning
+
+j = 0
+
+for (j in 1:1:100)
+{
+ls[c,9] =  e2 - 50 + j
+for (i in c:rowcount)
+{
+y[i] = y[i - 1] + nu[i - 1]*ls[i,9]
+nu[i] = nu[i - 1] + ls[i,8]*y[i] + ls[i,5]*ls[i,3]
+}
+y3[j] = abs(y[rowcount])
+nu3[j] = nu[rowcount - 1]
+}
+
+
+d3 = y3[1]
+e3 = 1
+
+for (j in 1:1:100)
+{
+if(y3[j]<d3)
+{
+d3 = y3[j]
+e3 = e2 - 50 + j
+}
+}
+
+
+ans[1]  = d3
+ans[2] = e3
+
+for (i in c:rowcount)
+{
+ls[c,9] = ans[2]
+y[i] = y[i - 1] + nu[i - 1]*ls[i,9]
+nu[i] = nu[i - 1] + ls[i,8]*y[i] + ls[i,5]*ls[i,3]
+}
+
+
+
+for(i in 1:rowcount)
+{
+if(ls[i,9] == 847)
+{
+ls[i,9] = ans[2]
+ls[i,2] = ls[i,9]*ls[i,3]
+}
+}
+
+
+for(i in 1:rowcount)
+{
+if(ls[i,2] == 847)
+{
+
+ls[i,2] = ans[2]*ls[i,3]
+}
+}
+
+
+# no solve condition end
+}
+
+
+# graphing - for those nice diagrams you see on zemax
+
+lsg = ls
+yg = ls
+nug = ls
+ParaxialTrace = yg
+
+# meridional
+lsga = lsg
+yga = yg
+nuga = nug
+MeridionalTrace = yga
+
+for(i in 1:1:13)
+{
+for(j in 1:1:rowcount)
+{
+yg[j,i] = 0
+nug[j,i]= 0
+xg[j,i] = 0
+
+yga[j,i] = 0
+nuga[j,i]= 0
+xga[j,i] = 0
+}
+}
+
+
+
+for(ia in 1:1:3)
+{
+for(ib in 1:1:3)
+{
+
+beamcomp[1] = objectsize*(ia - 1/2) + objectoffset
+yg[1,3*ia - 3 + ib] = beamcomp[1]
+nug[1,3*ia - 3 + ib] = ((epd - beamcomp[1])/lsg[2,2])*(ib - 2)
+# lithography Special
+# nug[1,3*ia - 3 + ib] = ((epd - objectsize/2 + objectoffset)/lsg[2,2])*(ib - 2)
+
+for(i in 2:1:rowcount)
+{
+yg[i,3*ia - 3 + ib] = yg[i - 1,3*ia - 3 + ib]  + nug[i - 1,3*ia - 3 + ib]*lsg[i,9]
+nug[i,3*ia - 3 + ib] = nug[i - 1,3*ia - 3 + ib] + lsg[i,8]*yg[i,3*ia - 3 + ib] + lsg[i,5]*lsg[i,3]
+xg[i,3*ia - 3 + ib] = ls[i,2] - ls[i,1] + sqrt(ls[i,1]*ls[i,1] - yg[i,3*ia - 3 + ib]*yg[i,3*ia - 3 + ib])
+}
+
+# meridional trace for your reference only
+for(j in 1:2)
+{
+
+qp[1] = beamcomp[1]
+up[1] =  asin( ((epd - beamcomp[1])/lsga[2,2])*(2 - ib) + epd*(1/1000)   )
+# lithography Special
+# up[1] = asin( ((epd - objectsize/2 + objectoffset)/lsga[2,2])*(ib - 2) + epd*(1/1000)   )
+
+# test
+#up[1] =  asin( ((3 - 1)/lsga[2,2])*(2 - 1) + 3*(1/1000)   )
+#up[1] = asin((1/15) + (3/1000))
+nuga[1,3*ia - 3 + ib] = up[1]
+
+for(i in 2:1:(rowcount - 1))
+{
+u[i] = up[i - 1] + lsga[i,3 + j]  
+q[i] = qp[i - 1] + lsga[i,2]*sin(u[i])
+I[i] = asin(q[i]*lsga[i,7] + sin(u[i]))
+Ip[i] = asin((lsga[i,3]*sin(I[i]))/lsga[i + 1,3])
+up[i] = Ip[i] - I[i] + u[i] 
+qp[i] = q[i]*((cos(up[i]) + cos(Ip[i]))/(cos(u[i]) + cos(I[i])))
+yga[i,3*ia - 3 + ib] = q[i] 
+nuga[i,3*ia - 3 + ib] = up[i]
+}
+}
+yga[1,3*ia - 3 + ib] = q[1]
+}
+}
+
+
+for(i in 1:1:rowcount)
+{
+for(j in 1:1:6)
+{
+ParaxialTrace[i,j] = paste('d',as.character(lsg[i,j]), sep ="")
+MeridionalTrace[i,j] = paste('d',as.character(lsga[i,j]), sep ="")
+}
+}
+
+for(i in 1:1:rowcount)
+{
+for(j in 7:1:16)
+{
+ParaxialTrace[i,j] = paste('d',as.character(yg[i,j - 6]), sep ="")
+MeridionalTrace[i,j] = paste('d',as.character(yga[i,j - 6]), sep ="")
+}
+}
+
+#for(i in 1:1:rowcount)
+#{
+#for(j in 16:1:26)
+#{
+#ParaxialTrace[i,j] = paste('d',as.character(xg[i,j - 16]), sep ="")
+#}
+#}
+
+
+
+
+
+

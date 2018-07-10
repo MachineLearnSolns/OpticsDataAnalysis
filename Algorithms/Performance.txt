@@ -1,0 +1,1057 @@
+
+
+# aberr******
+# sph******
+
+# solve2
+# modified for optmization algorithm, no spot diagram 
+
+# declare variables
+
+# common
+rowcount = 0
+rowcount = nrow(lsi)
+ls <- matrix('numeric',rowcount,13)
+
+# illumination 
+beamcomp <- vector('numeric',12)
+beam1 <- vector('numeric',12)
+beam2 <- vector('numeric',12)
+beam3 <- vector('numeric',12)
+beam4 <- vector('numeric',12)
+
+
+# glass 
+rowcountglass = 0
+rowcountglass = nrow(glassi)
+glass <- matrix('numeric',rowcountglass, 15)
+
+
+
+# solution
+solution <- vector('numeric', 15)
+
+# abberation sph
+u <- vector('numeric',rowcount)
+up <- vector('numeric',rowcount)
+q <- vector('numeric',rowcount)
+qp <- vector('numeric',rowcount)
+I <- vector('numeric',rowcount)
+Ip <- vector('numeric',rowcount)
+as1 <- vector('numeric',4)
+a1 <- vector('numeric',100)
+rms = 0
+
+# polar
+lspol <- matrix('numeric',rowcount,13)
+
+yp <- vector('numeric',rowcount)
+nup <- vector('numeric',rowcount)
+ap1 <- vector('numeric',4)
+na <- vector('numeric', 3)
+flp <- vector('numeric', 2*2)
+polim1 <- vector('numeric', 2)
+polim2 <- vector('numeric', 2)
+fp = 0
+
+
+# chromatic aberration
+
+lschr <- matrix('numeric',rowcount,13)
+
+yc <- vector('numeric',rowcount)
+nuc <- vector('numeric',rowcount)
+ac1 <- vector('numeric',4)
+na <- vector('numeric', 3)
+flc <- vector('numeric', 3*2)
+chrim1 <- vector('numeric', 2)
+chrim2 <- vector('numeric', 2)
+fc = 0
+
+# aperture stop
+# calculates the effective entrance pupil diameter for further computations 
+# stopsurfno is the surface number of the aperture stop. The expd is located at the final surface of the system while the epd is located at the first
+
+# entrance pupil diameter - light matter interactions
+epd = aiiood[1,4] #19
+stop = 0
+expd = aiiood[1,5] # 1000
+raycount = 0
+
+stopsurfno = aiiood[1,1] #2
+stopsize = aiiood[1,3] #5
+stopdist = aiiood[1,2] #40
+objectsize = aiiood[1,6] #0*epd
+objectoffset = aiiood[1,7]
+
+effepd <- vector('numeric',6)
+# the dummest version
+tryepdstore <- matrix('numeric',100,108 + 1)
+trialepd = 0
+tryeffepd1 = 0 
+tryeffepd2 = 0 
+trialeffepdstore = 0
+
+# computational variables
+coma = 0
+astig = 0
+chrome = 0
+polar = 0
+
+# paraxial focus
+lsfopar <- matrix('numeric',rowcount,13)
+
+
+# photometry
+field <- matrix('numeric',rowcount,7)
+
+
+# graphing
+lspolg <- matrix('numeric',rowcount,13)
+ypcg <- matrix('numeric',rowcount,13)
+nupcg <- matrix('numeric',rowcount,13)
+lschrg <- matrix('numeric',rowcount,13)
+ypcgo <- matrix('character',rowcount,16)
+AberrationTrace <- matrix('character',rowcount,16)
+SpotDiagram <- vector('numeric',100)
+RayFanPlot1 <- vector('numeric',100)
+RayFanPlot2 <- vector('numeric',100)
+PerformaceData <- vector('character',15)
+paraxialtrace = 0
+epdedgetrace = 0
+
+
+
+# iteration variables
+i = 0
+j = 0
+k = 0
+ia = 0
+ja = 0
+ka = 0
+
+
+#input
+
+ls = lsi
+glass = glassi
+
+# chrome
+lspol = lsi
+
+# polar
+lschr = lsi
+
+# polar
+lsfopar = lsi
+
+# photometry
+field = lsi
+
+for(i in 1:rowcount)
+{
+for(j in 1:7)
+{
+field[i,j] = 0
+}
+}
+
+# Normalized intensity along a primary axis
+field[1,1] = aiiood[13]
+# Normalized intensity along an orthogonal axis
+field[1,2] = aiiood[14]
+# Rotation of the primary axis
+field[1,3] = aiiood[23]
+# Phase difference
+field[1,4] = aiiood[24]
+# % polarixed
+field[1,5] = aiiood[25]
+# Intensity
+field[1,6] = aiiood[12] 
+# Wavelength
+field[1,7] = aiiood[11] # nm
+# beer constant
+beer = 1
+# Electro optic Kerr Constant
+EOKerr = 1*field[1,7]*(1/1000000000)
+# Electro optic Pockel Constant
+EOPockel = 1
+# Magneto optic Kerr Constant
+MOKerr = 1
+
+
+# aperture stop ritual
+
+tryepdstore = lsi
+
+for(i in 1:(108 + 1))
+{
+for(j in 1:100)
+{
+tryepdstore[j,i] = 0
+}
+}
+
+for(ka in 1:1:3)
+{
+for(ja in 1:1:2)
+{
+beamcomp[1] = objectsize*(ka/2 - 1)*(2 - ja) + objectoffset
+beamcomp[2] = objectsize*(ka/2 - 1)*(ja - 1)
+# meridional trace
+for(ia in 1:100)
+{
+trialepd = (ia)*(epd/100)
+
+# meridional trace with trialepd in place of epd - both sagittal and tangential
+
+for(k in 1:1:3)
+{
+for(j in 1:1:2)
+{
+qp[1] = beamcomp[j]
+up[1] = asin((beamcomp[j] + trialepd*(k/2 - 1))/ls[2,2] )
+for(i in 2:1:(rowcount - 1))
+{
+u[i] = up[i - 1] + ls[i,3 + j]  
+q[i] = qp[i - 1] + ls[i,2]*sin(u[i])
+I[i] = asin(q[i]*ls[i,7] + sin(u[i]))
+Ip[i] = asin((ls[i,3]*sin(I[i]))/ls[i + 1,3])
+up[i] = Ip[i] - I[i] + u[i] 
+qp[i] = q[i]*((cos(up[i]) + cos(Ip[i]))/(cos(u[i]) + cos(I[i])))
+
+}
+
+if(abs(q[stopsurfno] + stopdist*I[stopsurfno + 1]) < stopsize/2 && abs(q[(rowcount - 1)]) < expd/2)
+{
+
+tryepdstore[ia,36*ka + 18*ja + 6*k + 3*j - 63 + 1] = as.numeric(trialepd)
+tryepdstore[ia,36*ka + 18*ja + 6*k + 3*j - 63 + 2] = as.numeric(q[stopsurfno] + stopdist*I[stopsurfno + 1])
+tryepdstore[ia,36*ka + 18*ja + 6*k + 3*j - 63 + 3] = as.numeric(q[(rowcount - 1)] )
+tryepdstore[ia,108 + 1] = tryepdstore[ia,108 + 1] + as.numeric(trialepd + 
+abs(q[stopsurfno] + stopdist*I[stopsurfno + 1]) + abs(q[(rowcount - 1)]))
+}
+
+}
+}
+}
+}
+}
+
+# sort to select the rays nearest to the stop edge, epd, expd
+
+tryeffepd1 = tryepdstore[1,108 + 1] 
+trialeffepdstore = 0
+
+for (i in 1:100)
+{
+tryeffepd2 = tryepdstore[i,108 + 1]
+if(tryeffepd1 < tryeffepd2)
+{
+tryeffepd1 = tryeffepd2
+trialeffepdstore = i
+}
+}
+
+effepd[1] = tryepdstore[trialeffepdstore, 1*18 + 0 - 17]
+effepd[2] = tryepdstore[trialeffepdstore, 2*18 + 3 - 17]
+effepd[3] = tryepdstore[trialeffepdstore, 3*18 + 6 - 17]
+effepd[4] = tryepdstore[trialeffepdstore, 4*18 + 9 - 17]
+effepd[5] = tryepdstore[trialeffepdstore, 5*18 + 12 - 17]
+effepd[6] = tryepdstore[trialeffepdstore, 6*18 + 15 - 17]
+
+
+
+# more rituals
+
+# c-p-tn function
+cptn <- function(ls)
+{
+
+# c
+for (i in 1:rowcount)
+{
+if (ls[i,1] != 0)
+ls[i,7] = 1/ls[i,1]
+else
+ls[i,7] = 0
+
+}
+
+# p
+for (i in 1:rowcount)
+{
+if (ls[i,1] != 0)
+ls[i,8] = (ls[i,3] - ls[i+1,3])*ls[i,7]
+}
+
+# t/n
+for (i in 1:rowcount)
+{
+if (ls[i,2] != 0)
+ls[i,9] = ls[i,2]/ls[i,3] 
+else
+ls[i,9] = 0
+}
+return(ls)
+}
+
+
+abbeam <- function(ls,beamcomp,epd)
+{
+# algorithm begins
+
+# maintaining r-t-n & c-p-tn relations for optimization
+ls = cptn(ls)
+
+# the loop
+for(k in 1:1:3)
+{
+for(j in 1:1:2)
+{
+qp[1] = beamcomp[j]
+up[1] = asin((beamcomp[j] + epd*(k/2 - 1) - epd*(k/2 - 1)*(1/1000) + epd*(1/2000))/ls[2,2] )
+for(i in 2:1:(rowcount - 1))
+{
+u[i] = up[i - 1] + ls[i,3 + j]  
+q[i] = qp[i - 1] + ls[i,2]*sin(u[i])
+I[i] = asin(q[i]*ls[i,7] + sin(u[i]))
+Ip[i] = asin((ls[i,3]*sin(I[i]))/ls[i + 1,3])
+up[i] = Ip[i] - I[i] + u[i] 
+qp[i] = q[i]*((cos(up[i]) + cos(Ip[i]))/(cos(u[i]) + cos(I[i])))
+}
+# the coordinate on the image plane
+# beamcomp[j + 3*k] = (-1)*(sin(up[(rowcount - 1)])/qp[(rowcount - 1)])*(ls[rowcount,2] + (qp[(rowcount - 1)]/sin(up[(rowcount - 1)])))*(ls[rowcount,2])
+beamcomp[j + 3*k] = (1)*(ls[rowcount,2] + qp[(rowcount - 1)]/sin(up[(rowcount - 1)]))*(sin(up[(rowcount - 1)])) #*(ls[rowcount,2])
+# the angle of the beam
+beamcomp[3*k + 3] = atan( -sin(up[(rowcount - 1)]) )
+
+}
+}
+
+return(beamcomp)
+# algorithm ends
+}
+
+
+# copied from trpol - unmodified
+
+trpar <- function(epd,beamcomp,lspol)
+{
+fp = 0
+# for both tangential & sagittal components
+for(j in 1:2)
+{
+#boundary
+yp[1] = beamcomp[j]
+# on the edge of entrance pupil 
+nup[1] = (epd - beamcomp[j])/ls[2,2]
+
+# trace
+for(i in 2:(rowcount - 1))
+{
+yp[i] = yp[i - 1] + nup[i - 1]*lspol[i,9]
+nup[i] = nup[i - 1] + lspol[i,8]*yp[i] + lspol[i,3 + j]*lspol[i,3]
+}
+
+# solve
+fp = fp - (yp[(rowcount - 1)]/nup[(rowcount - 1)])
+polim1[j] = (-1)*(lspol[rowcount,2]  + (yp[(rowcount - 1)]/nup[(rowcount - 1)]))*(nup[(rowcount - 1)])
+}
+
+fp = fp/2
+# return(fp)
+ return(polim1)
+}
+
+# copied from trpar - unmodified
+
+focpar <- function(epd,beamcomp,lspol)
+{
+fp = 0
+# for both tangential & sagittal components
+for(j in 1:2)
+{
+#boundary
+yp[1] = beamcomp[j]
+# on the edge of entrance pupil 
+nup[1] = (epd - beamcomp[j])/ls[2,2]
+
+# trace
+for(i in 2:(rowcount - 1))
+{
+yp[i] = yp[i - 1] + nup[i - 1]*lspol[i,9]
+nup[i] = nup[i - 1] + lspol[i,8]*yp[i] + lspol[i,3 + j]*lspol[i,3]
+}
+
+# solve
+fp = fp - (yp[(1)]/nup[(rowcount - 1)])
+polim1[j] = (-1)*(lspol[rowcount,2]  + (yp[(rowcount - 1)]/nup[(rowcount - 1)]))*(nup[(rowcount - 1)])
+}
+
+#fp = fp/2
+return(fp)
+# return(polim1)
+}
+
+# c-p-tn-pol function
+cptnpol <- function(lspol)
+{
+
+
+# c
+for (i in 1:rowcount)
+{
+if (lspol[i,1] != 0)
+lspol[i,7] = 1/lspol[i,1]
+else
+lspol[i,7] = 0
+
+}
+
+# p
+for (i in 1:rowcount)
+{
+if (lspol[i,1] != 0)
+lspol[i,8] = (lspol[i,3] - lspol[i+1,3])*lspol[i,7]
+}
+
+
+# t/n
+for (i in 1:rowcount)
+{
+if (lspol[i,2] != 0)
+lspol[i,9] = lspol[i,2]/lspol[i,3] 
+else
+lspol[i,9] = 0
+}
+return(lspol)
+}
+
+
+trpol <- function(epd,beamcomp,lspol)
+{
+fp = 0
+# for both tangential & sagittal components
+for(j in 1:2)
+{
+#boundary
+yp[1] = beamcomp[j]
+# on the edge of entrance pupil 
+nup[1] = (epd - beamcomp[j])/ls[2,2]
+
+# trace
+for(i in 2:(rowcount - 1))
+{
+yp[i] = yp[i - 1] + nup[i - 1]*lspol[i,9]
+nup[i] = nup[i - 1] + lspol[i,8]*yp[i] + lspol[i,3 + j]*lspol[i,3]
+}
+
+# solve
+fp = fp - (yp[(rowcount - 1)]/nup[(rowcount - 1)])
+polim1[j] = (-1)*(lspol[rowcount,2]  + (yp[(rowcount - 1)]/nup[(rowcount - 1)]))*(nup[(rowcount - 1)])
+}
+
+fp = fp/2
+#return(fp)
+return(polim1)
+}
+
+
+# c-p-tn-chr function
+cptnchr <- function(lschr)
+{
+
+
+# c
+for (i in 1:rowcount)
+{
+if (lschr[i,1] != 0)
+lschr[i,7] = 1/lschr[i,1]
+else
+lschr[i,7] = 0
+
+}
+
+# p
+for (i in 1:rowcount)
+{
+if (lschr[i,1] != 0)
+lschr[i,8] = (lschr[i,3] - lschr[i+1,3])*lschr[i,7]
+}
+
+# t/n
+for (i in 1:rowcount)
+{
+if (lschr[i,2] != 0)
+lschr[i,9] = lschr[i,2]/lschr[i,3] 
+else
+lschr[i,9] = 0
+}
+return(lschr)
+}
+
+
+trchr <- function(epd,beamcomp,lschr)
+{
+
+fc = 0
+
+# for both tangential & sagittal components
+for(j in 1:2)
+{
+
+#boundary
+yc[1] = beamcomp[j]
+
+# on the edge of entrance pupil 
+nuc[1] = (epd - beamcomp[j])/ls[2,2]
+
+
+# trace
+for(i in 2:(rowcount - 1))
+{
+yc[i] = yc[i - 1] + nuc[i - 1]*lschr[i,9]
+nuc[i] = nuc[i - 1] + lschr[i,8]*yc[i] + lschr[i,3 + j]*lschr[i,3]
+}
+# solve
+fc = - (yc[(rowcount - 1)]/nuc[(rowcount - 1)])
+chrim1[j] =   (-1)*(lschr[rowcount,2]  + (yc[(rowcount - 1)]/nuc[(rowcount - 1)]))*(nuc[(rowcount - 1)])
+}
+
+# fc = fc/2
+#return(fc)
+return(chrim1)
+
+}
+
+
+
+# computations begin
+
+# aberrations`
+
+# spherical 
+
+
+
+rms = 0
+# paraxial
+beamcomp[1] = 0
+beamcomp[2] = 0
+
+# graphing formality
+i = 1
+beam1 = abbeam(ls,beamcomp,(effepd[3] - (effepd[3]*i)/100))
+epdedgetrace = beam1[4]
+i = 99
+beam1 = abbeam(ls,beamcomp,(effepd[3] - (effepd[3]*i)/100))
+paraxialtrace = beam1[4]
+
+for(i in 1:1:99)
+{
+beam1 = abbeam(ls,beamcomp,(effepd[3] - (effepd[3]*i)/100))
+a1[i] = beam1[4]
+rms = rms + (a1[i])^2
+
+# for the spot diagram graphing
+
+SpotDiagram[i] = paste('d',as.character((a1[i] - paraxialtrace)/(epdedgetrace - paraxialtrace)), sep ="")
+
+}
+rms = sqrt(rms)*100
+SpotDiagram[100] = paste('d',as.character((a1[100] - paraxialtrace)/(epdedgetrace - paraxialtrace)), sep ="")
+
+
+# coma metric for optimization - the -45045 standard
+# standard is - object 1/2 the size of the entrance 
+
+# pupil diameter, and placed at 3 # positions on the image 
+
+# plane -45,0,45 degrees to the paraxial axis.
+
+# The paraxial ray is defined to be ray with height 0.0001% of epd and not dead center
+
+for(i in 1:3)
+{
+# sagittal
+beamcomp[1] = (effepd[3]/4)*(i - 2) + effepd[3]/16 #- (abs(i - 2) - 1)*(effepd[3]/100)#(tan((pi/4)*(i -2))*ls[2,2] + effepd[3]/8)
+beam1 = abbeam(ls,beamcomp,effepd[2*i - 1])
+beamcomp[1] =  (effepd[3]/4)*(i - 2) - effepd[3]/16 #- (abs(i - 2) - 1)*(effepd[3]/100)# (tan((pi/4)*(i - 2))*ls[2,2] - effepd[3]/8)
+beam2 = abbeam(ls,beamcomp,effepd[2*i - 1])
+mag = abs((abs(beam1[1 + 3*1]) - abs(beam2[1 + 3*1]))/(0.0625*effepd[3]))
+coma = coma + mag
+# tangential
+beamcomp[2] = (effepd[3]/4)*(i - 2) + effepd[3]/16 #- (abs(i - 2) - 1)*(effepd[3]/100)#(tan((pi/4)*(i - 2))*ls[2,2] + effepd[3]/8)
+beam1 = abbeam(ls,beamcomp,effepd[2*i - 0])
+beamcomp[2] =  (effepd[3]/4)*(i - 2) - effepd[3]/16 #- (abs(i - 2) - 1)*(effepd[3]/100)# (tan((pi/4)*(i - 2))*ls[2,2] - effepd[3]/8)
+beam2 = abbeam(ls,beamcomp,effepd[2*i - 0])
+mag = abs((abs(beam1[2 + 3*1]) - abs(beam2[2 + 3*1]))/(0.0625*effepd[3]))
+coma = coma + mag
+}
+coma = coma/6	
+
+# New coma - it's the magnification of rays 
+
+# tangential
+beamcomp[1] = effepd[3]/1000
+beamcomp[2] =  objectsize/2 + objectoffset
+beam1 = abbeam(ls,beamcomp,effepd[2])
+beamcomp[1] = effepd[3]/1000
+beamcomp[2] =   - objectsize/2 + objectoffset
+beam2 = abbeam(ls,beamcomp,effepd[6])
+mag = (abs(beam1[2 + 3*1]))/(abs(objectsize/2 + objectoffset))
+
+
+beamcomp[1] = effepd[3]/1000
+beamcomp[2] =  objectsize/4 + objectoffset
+beam1 = abbeam(ls,beamcomp,effepd[2])
+beamcomp[1] = effepd[3]/1000
+beamcomp[2] =   - objectsize/2 + objectoffset
+beam2 = abbeam(ls,beamcomp,effepd[6])
+coma = ((abs(beam1[2 + 3*1]))/(abs(objectsize/4 + objectoffset)) - mag)*(1)
+
+
+# sagittal
+beamcomp[1] =  objectsize/2 + objectoffset
+beamcomp[2] =  effepd[3]/1000
+beam1 = abbeam(ls,beamcomp,effepd[3])
+beamcomp[1] =  - objectsize/2 + objectoffset
+beamcomp[2] = effepd[3]/1000
+beam2 = abbeam(ls,beamcomp,effepd[1])
+mag = (abs(beam1[1 + 3*1]))/(abs(objectsize/2 + objectoffset))
+
+
+beamcomp[1] =  objectsize/4 + objectoffset
+beamcomp[2] =  effepd[3]/1000
+beam1 = abbeam(ls,beamcomp,effepd[3])
+beamcomp[1] =  - objectsize/2 + objectoffset
+beamcomp[2] = effepd[3]/1000
+beam2 = abbeam(ls,beamcomp,effepd[1])
+coma = (  (abs(beam1[1 + 3*1]))/(abs(objectsize/4 + objectoffset)) - mag)*(1)
+
+coma = coma*(1/(atan((objectsize/2 + objectoffset)/ls[2,2]) - atan((objectsize/4 + objectoffset)/ls[2,2])))
+#
+
+# astigmatism - paraxial
+for(i in 1:1:2)
+{
+# sagittal
+beamcomp[1] = 0
+beam1 = abbeam(ls,beamcomp,effepd[3])
+# tangential
+beamcomp[2] = 0
+beam2 = abbeam(ls,beamcomp,effepd[3])
+astig = astig + beam1[4]/beam2[5]
+}
+astig = astig/2
+
+
+
+# magnification - just like coma with i = 2 also changed the - into + when calculating magnification
+
+
+# tangential
+beamcomp[1] = effepd[3]/1000
+beamcomp[2] =  objectsize/2 + objectoffset
+beam1 = abbeam(ls,beamcomp,effepd[2])
+beamcomp[1] = effepd[3]/1000
+beamcomp[2] =   - objectsize/2 + objectoffset
+beam2 = abbeam(ls,beamcomp,effepd[6])
+mag = (abs(beam1[2 + 3*1]))/(abs(objectsize/2 + objectoffset))
+# sagittal
+beamcomp[1] =  objectsize/2 + objectoffset
+beamcomp[2] =  effepd[3]/1000
+beam1 = abbeam(ls,beamcomp,effepd[3])
+beamcomp[1] =  - objectsize/2 + objectoffset
+beamcomp[2] = effepd[3]/1000
+beam2 = abbeam(ls,beamcomp,effepd[1])
+mag = (abs(beam1[1 + 3*1]))/(abs(objectsize/2 + objectoffset))
+
+
+
+# polarization
+
+# specifying optical properties for all surfaces
+
+for(i in 1:1:2)
+{
+for(j in 1:(rowcount - 1))
+{
+if(lspol[j,13] != 1)
+{
+lspol[j,3] =  as.numeric(glass[lspol[j,13],i + 6])
+# Electro Optic Effects - Pockel and Kerr
+if(i == 1)
+{
+lspol[j,3] = lspol[j,3] + (lspol[j,3]*lspol[j,3]*lspol[j,3])*( (as.numeric(glass[lspol[j,13],10]))*ls[j,10]*EOPockel   +  (as.numeric(glass[lspol[j,13],10]))*ls[j,10]*ls[j,10]*EOKerr )*(1/2)
+}
+
+}
+}
+
+# maintaining r-t-n & c-p-tn relations for optimization
+# computes p, tn (and c) with the new index n
+lspol = cptnpol(lspol)
+
+
+# sagittal
+beamcomp[1] = objectsize/2 + objectoffset
+beamcomp[2] = 0
+
+# fl[i] = trpol(epd,beamcomp,lspol)
+# ap1[i] = fl[i]
+polim1 = trpol(effepd[3],beamcomp,lspol)
+#flp[2*i - 1] = polim1[1]
+#flp[2*i] = polim1[2]
+
+beam1 = abbeam(lspol,beamcomp,effepd[3])
+flp[2*i - 1] = beam1[4]
+
+beamcomp[1] = - objectsize/2 + objectoffset
+beamcomp[2] = 0
+
+beam1 = abbeam(lspol,beamcomp,effepd[3])
+flp[2*i] = beam1[4]
+
+}
+
+# ap1[3] = ap1[1] - ap1[2] 
+# polar = ((sqrt((flp[1] - flp[3])^2 + (flp[2] - flp[4])^2)/lspol[rowcount,2])*100
+# polar = (((flp[1] - flp[3])^2 + (flp[2] - flp[4])^2)/lspol[rowcount,2])*100
+polar = (((flp[1] - flp[3])^2 + (flp[2] - flp[4])^2)/lspol[rowcount,2])*100
+
+
+# chrome
+
+# specifying optical properties for all surfaces
+
+for(i in 1:1:3)
+{
+for(j in 1:(rowcount - 1))
+{
+if(lschr[j,13] != 1)
+{
+lschr[j,3] = as.numeric(glass[lschr[j,13],i])
+}
+}
+
+# maintaining r-t-n & c-p-tn relations for optimization
+# computes p, tn (and c) with the new index n
+lschr = cptnchr(lschr)
+
+# sagittal
+beamcomp[1] = objectsize/2 + objectoffset
+beamcomp[2] = 0
+#fl[i] = trchr(epd,beamcomp,lschr)
+#ac1[i] = fl[i]
+chrim1 = trchr(effepd[3],beamcomp,lschr)
+# flc[2*i - 1] = chrim1[1]
+# flc[2*i] = chrim1[2]
+
+beam1 = abbeam(lschr,beamcomp,effepd[3])
+flc[2*i - 1] = beam1[4]
+
+beamcomp[1] = - objectsize/2 + objectoffset
+beamcomp[2] = 0
+
+beam1 = abbeam(lschr,beamcomp,effepd[3])
+flc[2*i] = beam1[4]
+
+
+
+ac1[i] = sqrt((flc[2*i - 1])^2 + (flc[2*i])^2)
+
+}
+
+ac1[4] = ac1[2] - ac1[3] 
+chrome   = (ac1[4]/ac1[2])*100
+
+# photometry 
+for(i in 2:(rowcount))
+{
+
+field[i,1] = field[i - 1,1]*(cos(ls[i,12] - field[i,3]))^2
+field[i,2] = field[i - 1,2]*(cos(ls[i,12] - field[i,3] + (pi/2)*(as.numeric(glass[ls[i,13],8]) -  as.numeric(glass[ls[i,13],9]))*(1/(as.numeric(glass[ls[i,13],8]) -  as.numeric(glass[ls[i,13],9]) + 0.00000001)) ))^2
+field[i,4] = (field[i - 1,4] + 2*pi*ls[i,2]*(as.numeric(glass[ls[i,13],8]) -  as.numeric(glass[ls[i,13],9]))*(1/field[1,7]))%%(pi)
+#beer
+field[i,6] = field[i - 1,6]*exp(-(ls[i,2]*as.numeric(glass[ls[i,13],13])*beer)) 
+# Kerr Effect ->  magnetic field
+field[i,3] = field[i - 1,3]  + as.numeric(glass[ls[i,13],12])*ls[i,11]*ls[i,2]*(1/1000)*MOKerr
+
+
+}
+
+solution[1] = ls[rowcount,2]
+solution[2] = rms
+solution[3] = coma
+solution[4] = astig
+solution[5] = chrome
+solution[6] = polar
+solution[7] = mag
+solution[8] = field[rowcount,1]
+solution[9] = field[rowcount,2]
+solution[10] = field[rowcount,3]
+solution[11] = field[rowcount,4]
+solution[12] = field[rowcount,6]
+solution[13] = ans[2,1]
+solution[14] = 0
+solution[15] = 0
+
+solution[1] = ls[rowcount,2]
+solution[2] = ans[2,1]
+solution[3] = mag
+solution[4] = rms
+solution[5] = astig
+solution[6] = coma
+solution[7] = chrome
+solution[8] = polar
+solution[9] = field[rowcount,1]
+solution[10] = field[rowcount,2]
+solution[11] = field[rowcount,3]
+solution[12] = field[rowcount,4]
+solution[13] = field[rowcount,6]
+solution[14] = 0
+solution[15] = 0
+
+# paraxial focal length = trpar(effepd[3],beamcomp,lsfopar) with beamcomp[1] = beamcomp[2] = effepd[3]
+
+# graphing
+# chrome & polar trace
+
+lspolg = lspol
+lschrg = lschr
+ypcg = ls
+nupcg = ls
+ypcgo = (ypcg)
+
+
+for(i in 1:1:13)
+{
+for(j in 1:1:rowcount)
+{
+ypcg[j,i] = 0
+nupcg[j,i]= 0
+}
+}
+
+for(ia in 1:1:2)
+{
+for(ja in 1:(rowcount - 1))
+{
+if(lspolg[ja,13] != 1)
+{
+lspolg[ja,3] =  as.numeric(glass[lspolg[ja,13],ia + 6])
+# Electro Optic Effects - Pockel and Kerr
+if(i == 1)
+{
+lspol[j,3] = lspol[j,3] + (lspol[j,3]*lspol[j,3]*lspol[j,3])*( (as.numeric(glass[lspol[j,13],10]))*ls[j,10]*EOPockel   +  (as.numeric(glass[lspol[j,13],10]))*ls[j,10]*ls[j,10]*EOKerr )*(1/2)
+}
+}
+}
+
+# maintaining r-t-n & c-p-tn relations for optimization
+# computes p, tn (and c) with the new index n
+lspolg = cptnpol(lspolg)
+
+# paraxial 
+beamcomp[1] = objectsize/2
+beamcomp[2] = 0
+# fl[i] = trpol(epd,beamcomp,lspol)
+# ap1[i] = fl[i]
+# polim1 = trpol(epd,beamcomp,lspol)
+
+
+#trpol <- function(epd,beamcomp,lspol)
+# {
+fp = 0
+# for both extremes of the tangential axis
+for(j in 1:2)
+{
+#boundary
+ypcg[1,2*ia - 2 + j] = beamcomp[j]*(2*j - 3)
+# on the edge of entrance pupil 
+nupcg[1,2*ia - 2 + j] = ((effepd[3] - beamcomp[j])/lspolg[2,2])*(2*j - 3)
+
+# trace
+for(i in 2:(rowcount - 1))
+{
+ypcg[i,2*ia - 2 + j] = ypcg[i - 1,2*ia - 2 + j] + nupcg[i - 1,2*ia - 2 + j]*lspolg[i,9]
+nupcg[i,2*ia - 2 + j] = nupcg[i - 1,2*ia - 2 + j] + lspolg[i,8]*ypcg[i,2*ia - 2 + j] + lspolg[i,3 + j]*lspolg[i,3]
+}
+
+# solve
+# fp = fp - (yp[(rowcount - 1)]/nup[(rowcount - 1)])
+# polim1[j] = (-1)*(lspol[rowcount,2]  + (yp[(rowcount - 1)]/nup[(rowcount - 1)]))*(nup[(rowcount - 1)])
+# }
+
+# fp = fp/2
+#return(fp)
+# return(polim1)
+#}
+
+# flp[2*ia - 1] = polim1[1]
+# flp[2*ia] = polim1[2]
+}
+}
+
+
+
+for(ia in 1:1:3)
+{
+for(ja in 1:(rowcount - 1))
+{
+if(lschrg[j,13] != 1)
+{
+lschrg[ja,3] = as.numeric(glass[lschrg[j,13],i])
+}
+}
+
+# maintaining r-t-n & c-p-tn relations for optimization
+# computes p, tn (and c) with the new index n
+lschrg = cptnchr(lschrg)
+
+
+# paraxial 
+beamcomp[1] = objectsize/2
+beamcomp[2] = 0
+# fl[i] = trpol(epd,beamcomp,lspol)
+# ap1[i] = fl[i]
+# polim1 = trpol(epd,beamcomp,lspol)
+
+#trpol <- function(epd,beamcomp,lspol)
+# {
+fp = 0
+# for both extremes of the tangential axis
+for(j in 1:2)
+{
+#boundary
+ypcg[1,4 + 2*ia - 2 + j] = beamcomp[j]*(2*j - 3)
+# on the edge of entrance pupil 
+nupcg[1,4 + 2*ia - 2 + j] = ((effepd[3] - beamcomp[j])/lspolg[2,2])*(2*j - 3)
+
+# trace
+for(i in 2:(rowcount - 1))
+{
+ypcg[i,4 + 2*ia - 2 + j] = ypcg[i - 1,4 + 2*ia - 2 + j] + nupcg[i - 1,4 + 2*ia - 2 + j]*lspolg[i,9]
+nupcg[i,4 + 2*ia - 2 + j] = nupcg[i - 1,4 + 2*ia - 2 + j] + lspolg[i,8]*ypcg[i,4 + 2*ia - 2 + j] + lspolg[i,3 
+
++ j]*lspolg[i,3]
+}
+
+}
+}
+
+
+for(i in 1:1:rowcount)
+{
+for(j in 1:1:6)
+{
+ypcgo[i,j] = paste('d',as.character(lschrg[i,j]), sep ="")
+AberrationTrace[i,j] = paste('d',as.character(lschrg[i,j]), sep ="")
+}
+}
+
+for(i in 1:1:rowcount)
+{
+for(j in 7:1:16)
+{
+ypcgo[i,j] = paste('d',as.character(ypcg[i,j - 6]), sep ="")
+AberrationTrace[i,j] = paste('d',as.character(ypcg[i,j - 6]), sep ="")
+}
+}
+
+
+# spot diagram
+
+
+
+# coma
+
+
+# ray fan plots
+
+# spherical abberation - paraxial object varying epd
+beamcomp[1] = 0
+beamcomp[2] = 0
+
+# boundary
+i = 1
+beam1 = abbeam(ls,beamcomp,(effepd[3] - (effepd[3]*i)/50))
+epdedgetrace = beam1[4]
+i = 50
+beam1 = abbeam(ls,beamcomp,(effepd[3]*(1/100) - (effepd[3]*i)/50))
+paraxialtrace = beam1[4]
+
+for(i in 1:1:100)
+{
+beam1 = abbeam(ls,beamcomp,(effepd[3] - (effepd[3]*i)/50))
+a1[i] = beam1[4]
+
+# for the spot diagram graphing
+
+RayFanPlot1[i] = paste('d',as.character((a1[i] - paraxialtrace)/(epdedgetrace - paraxialtrace) - 0.5), sep 
+
+="")
+
+}
+RayFanPlot1[50] = paste('d',as.character((0 - paraxialtrace)/(epdedgetrace - paraxialtrace) - 0.5), sep ="")
+
+# angular abberation - off axis object -
+
+# spherical abberation - paraxial object varying epd
+beamcomp[1] = objectsize
+beamcomp[2] = 0
+
+# boundary
+i = 1
+beam1 = abbeam(ls,beamcomp,(effepd[1] - (effepd[1]*i)/50))
+epdedgetrace = abs(beam1[4])
+i = 100
+beam1 = abbeam(ls,beamcomp,(effepd[1] - (effepd[1]*i)/50))
+paraxialtrace = abs(beam1[4])
+
+for(i in 1:1:100)
+{
+beam1 = abbeam(ls,beamcomp,(effepd[1] - (effepd[1]*i)/50))
+a1[i] = abs(beam1[4])
+
+# for the spot diagram graphing
+
+#RayFanPlot2[i] = paste('d',as.character((a1[i] - paraxialtrace)/(epdedgetrace - paraxialtrace) - 0.5), sep ="")
+RayFanPlot2[i] = paste('d',as.character((a1[i])/(paraxialtrace) - 0), sep ="")
+}
+#RayFanPlot2[50] = paste('d',as.character((0 - paraxialtrace)/(epdedgetrace - paraxialtrace) - 0.5), sep ="")
+
+
+# data 
+
+# for focal length
+beamcomp[1] = effepd[3]
+beamcomp[1] = effepd[3]
+
+
+PerformaceData[1] = paste('<tr> <td>Imaging Distance</td> <td>', '</td> </tr>' , sep = as.character(solution[1]))
+PerformaceData[2] = paste( paste('<tr> <td>Paraxial Focal Length </td> <td>', '</td> </tr>' , sep = as.character(focpar(effepd[3],beamcomp,lsfopar))) ,paste('<tr> <td>Solve</td> <td>', '</td> </tr>' , sep = as.character(solution[2])),   sep = '<br>')
+PerformaceData[3] = paste('<tr> <td>Magnification</td> <td> <!-- collect mag here start -->', '<!-- collect mag here end --></td> </tr>' , sep = as.character(solution[3]))
+PerformaceData[4] = paste('<tr> <td>RMS Spot Size</td> <td>', '</td> </tr>' , sep = as.character(solution[4]))
+PerformaceData[5] = paste('<tr> <td>Astigmatism</td> <td>', '</td> </tr>' , sep = as.character(solution[5]))
+PerformaceData[6] = paste('<tr> <td>Angular Aberration</td> <td> <!-- collect coma here start -->', '<!-- collect coma here end --></td> </tr>' , sep = as.character(solution[6]))
+PerformaceData[7] = paste('<tr> <td>Transverse Chromatic Abberration</td> <td>', '</td> </tr>' , sep = as.character(solution[7]))
+PerformaceData[8] = paste('<tr> <td>Transverse Birefringent Aberration</td> <td>', '</td> </tr>' , sep = as.character(solution[8]))
+PerformaceData[9] = paste('<tr> <td>Norm. Tangential Polarization</td> <td>', '</td> </tr>' , sep = as.character(solution[9]))
+PerformaceData[10] = paste('<tr> <td>Norm. Sagittal Polarization</td> <td>', '</td> </tr>' , sep = as.character(solution[10]))
+PerformaceData[11] = paste('<tr> <td>Polarization Rotation</td> <td>', '</td> </tr>' , sep = as.character(solution[11]))
+PerformaceData[12] = paste('<tr> <td>Polarization Phase Diff</td> <td>', '</td> </tr>' , sep = as.character(solution[12]))
+PerformaceData[13] = paste('<tr> <td>Intensity</td> <td>', '</td> </tr>' , sep = as.character(solution[13]))
+PerformaceData[14] = paste('<tr> <td>Initial Merit Function</td> <td>', '</td> </tr>' , sep = as.character(solution[14]))
+PerformaceData[15] = paste('<tr> <td>Optimized Merit Function</td> <td>', '</td> </tr>' , sep = as.character(solution[15]))
+
+
+# <tr>
+    #<td>Paraxial Focal Length</td>
+    #<td>0</td> 
+      #</tr>
+
+# test
+
